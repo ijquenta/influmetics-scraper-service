@@ -12,7 +12,7 @@ client = ApifyClientAsync(APIFY_API_TOKEN)
 
 ACTOR_ID = "clockworks/tiktok-scraper"
 
-async def scrape_profiles(profiles: list[str], results_per_page: int = 50) -> list[dict]:
+async def scrape_profiles(profiles: list[str], results_per_page: int = 5) -> list[dict]:
     run_input = {
         "profiles": profiles,
         "resultsPerPage": results_per_page,
