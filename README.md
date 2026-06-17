@@ -1,4 +1,4 @@
-# TikTok Profile Scraper API
+# TikTok Profile Scraper API By Apify
 
 Thin FastAPI wrapper around Apify's [`clockworks/tiktok-scraper`](https://apify.com/clockworks/tiktok-scraper) actor. Exposes a single endpoint to scrape public TikTok profile data (profile info + videos).
 
