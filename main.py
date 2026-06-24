@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from models.schemas import ScrapeProfileRequest, ScrapeCommentsRequest, ProfileWithCommentsRequest
 from services.apify_service import scrape_profiles, is_configured as apify_configured
 from services.comments_service import scrape_comments, build_video_url
+from services.mappers import map_video_item, map_comment_item
 from core.security import get_api_key
 
 logging.basicConfig(
@@ -59,7 +60,8 @@ async def get_profile(request: ScrapeProfileRequest, api_key: str = Depends(get_
             should_download_slideshow_images=request.shouldDownloadSlideshowImages,
             should_download_subtitles=request.shouldDownloadSubtitles,
         )
-        return {"profiles": request.profiles, "total": len(data), "results": data}
+        mapped = [map_video_item(item) for item in data]
+        return {"profiles": request.profiles, "total": len(mapped), "results": mapped}
     except TimeoutError as e:
         logger.error("Request timed out: %s", e)
         raise HTTPException(status_code=504, detail=str(e))
@@ -76,7 +78,8 @@ async def get_comments(request: ScrapeCommentsRequest, api_key: str = Depends(ge
             comments_per_post=request.commentsPerPost,
             max_replies_per_comment=request.maxRepliesPerComment,
         )
-        return {"videoUrls": request.videoUrls, "total": len(data), "results": data}
+        mapped = [map_comment_item(item) for item in data]
+        return {"videoUrls": request.videoUrls, "total": len(mapped), "results": mapped}
     except TimeoutError as e:
         logger.error("Request timed out: %s", e)
         raise HTTPException(status_code=504, detail=str(e))
@@ -100,30 +103,37 @@ async def get_profile_with_comments(
             should_download_subtitles=request.shouldDownloadSubtitles,
         )
 
+        mapped_videos = [map_video_item(item) for item in profile_data]
+
         videos_with_comments = [
-            v for v in profile_data
-            if v.get("authorMeta") and v.get("id") and v.get("commentCount", 0) > 0
+            v for v in mapped_videos
+            if v.get("id") and v.get("commentCount", 0) > 0
         ]
         videos_with_comments.sort(key=lambda v: v["commentCount"], reverse=True)
         top_videos = videos_with_comments[:request.topVideos]
 
         video_urls = [
-            build_video_url(v["authorMeta"]["name"], v["id"])
+            build_video_url(v["author"]["name"], v["id"])
             for v in top_videos
         ]
 
-        comments = []
+        comments: dict[str, list[dict]] = {}
         if video_urls:
-            comments = await scrape_comments(
+            raw_comments = await scrape_comments(
                 video_urls=video_urls,
                 comments_per_post=request.commentsPerPost,
                 max_replies_per_comment=request.maxRepliesPerComment,
             )
+            for c in raw_comments:
+                mapped = map_comment_item(c)
+                vid = mapped["videoId"]
+                if vid:
+                    comments.setdefault(vid, []).append(mapped)
 
         return {
             "profiles": request.profiles,
-            "total": len(profile_data),
-            "results": profile_data,
+            "total": len(mapped_videos),
+            "results": mapped_videos,
             "comments": comments,
             "analyzedVideos": len(video_urls),
         }
