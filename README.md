@@ -18,9 +18,11 @@ pip install -r requirements.txt
 
 Create `.env` (see `.env.example`):
 
-```
+```env
 APIFY_API_TOKEN=ak_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 API_KEY=<any string, used as bearer for X-API-Key header>
+APIFY_TIMEOUT_SECONDS=120
+CORS_ORIGINS=["*"]
 ```
 
 ## Run
@@ -92,7 +94,16 @@ Scrape one or more TikTok profiles.
 
 Refer to [Apify docs](https://apify.com/clockworks/tiktok-scraper/api) for full output schema.
 
-**Error codes** (from the actor, passed through in results):
+**HTTP errors:**
+
+| Status | When |
+|--------|------|
+| `401` | Invalid or missing `X-API-Key` |
+| `422` | Invalid request body (Pydantic validation) |
+| `504` | Apify actor timed out (see `APIFY_TIMEOUT_SECONDS`) |
+| `500` | Unexpected server error |
+
+**Actor error codes** (returned inside results array):
 
 | errorCode | Meaning |
 |-----------|---------|
@@ -102,11 +113,15 @@ Refer to [Apify docs](https://apify.com/clockworks/tiktok-scraper/api) for full 
 
 ## Auth
 
-All POST requests require `X-API-Key` header. Key is set via `API_KEY` in `.env`. No default fallback — if unset, the app crashes on startup with `RuntimeError`.
+All POST requests require `X-API-Key` header. Key is set via `API_KEY` env var. Validated on first request, not at startup.
 
 ## CORS
 
-Wide open (`*`). Tighten `allow_origins` in `main.py` if needed.
+Controlled via `CORS_ORIGINS` env var (JSON array). Default: `["*"]` (wide open). Set to specific origins for production:
+
+```env
+CORS_ORIGINS=["https://myapp.com", "https://admin.myapp.com"]
+```
 
 ## Project Structure
 
