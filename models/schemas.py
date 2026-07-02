@@ -26,3 +26,14 @@ class ProfileWithCommentsRequest(BaseModel):
     shouldDownloadCovers: bool = False
     shouldDownloadSlideshowImages: bool = False
     shouldDownloadSubtitles: bool = False
+
+
+class ScrapeHashtagRequest(BaseModel):
+    hashtags: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    maxItems: int = Field(default=50, ge=10, le=200)
+
+    def check_at_least_one(self):
+        if not self.hashtags and not self.keywords:
+            raise ValueError("Se requiere al menos un hashtag o keyword")
+        return self

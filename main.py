@@ -7,8 +7,8 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from models.schemas import ScrapeProfileRequest, ScrapeCommentsRequest, ProfileWithCommentsRequest
-from services.apify_service import scrape_profiles, is_configured as apify_configured
+from models.schemas import ScrapeProfileRequest, ScrapeCommentsRequest, ProfileWithCommentsRequest, ScrapeHashtagRequest
+from services.apify_service import scrape_profiles, scrape_by_hashtags, is_configured as apify_configured
 from services.comments_service import scrape_comments, build_video_url
 from services.mappers import map_video_item, map_comment_item
 from core.security import get_api_key
@@ -85,6 +85,30 @@ async def get_comments(request: ScrapeCommentsRequest, api_key: str = Depends(ge
         raise HTTPException(status_code=504, detail=str(e))
     except Exception:
         logger.exception("Failed to scrape comments for %s", request.videoUrls)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.post("/scrape/hashtags")
+async def get_hashtag_results(request: ScrapeHashtagRequest, api_key: str = Depends(get_api_key)):
+    try:
+        request.check_at_least_one()
+        data = await scrape_by_hashtags(
+            hashtags=request.hashtags or None,
+            keywords=request.keywords or None,
+            max_items=request.maxItems,
+        )
+        mapped = [map_video_item(item) for item in data]
+        return {
+            "hashtags": request.hashtags,
+            "keywords": request.keywords,
+            "total": len(mapped),
+            "results": mapped,
+        }
+    except TimeoutError as e:
+        logger.error("Request timed out: %s", e)
+        raise HTTPException(status_code=504, detail=str(e))
+    except Exception:
+        logger.exception("Failed to scrape hashtags %s", request.hashtags)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

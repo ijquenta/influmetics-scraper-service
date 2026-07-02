@@ -56,3 +56,39 @@ async def scrape_profiles(
 
     dataset = client.dataset(run.default_dataset_id)
     return [item async for item in dataset.iterate_items()]
+
+
+HASHTAG_ACTOR_ID = "clockworks/tiktok-hashtag-scraper"
+
+
+async def scrape_by_hashtags(
+    hashtags: list[str] | None = None,
+    keywords: list[str] | None = None,
+    max_items: int = 50,
+) -> list[dict]:
+    clean_hashtags = [h.lstrip("#") for h in (hashtags or [])]
+
+    run_input: dict = {
+        "hashtags": clean_hashtags,
+        "resultsPerPage": min(max_items, 200),
+        "shouldDownloadVideos": False,
+        "shouldDownloadCovers": False,
+        "shouldDownloadSlideshowImages": False,
+        "shouldDownloadSubtitles": False,
+    }
+
+    if keywords:
+        run_input["searchQueries"] = keywords
+
+    client = _get_client()
+    try:
+        run = await asyncio.wait_for(
+            client.actor(HASHTAG_ACTOR_ID).call(run_input=run_input),
+            timeout=_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        logger.error("Hashtag scraping timed out after %ds", _TIMEOUT_SECONDS)
+        raise TimeoutError(f"Hashtag scraping timed out after {_TIMEOUT_SECONDS}s")
+
+    dataset = client.dataset(run.default_dataset_id)
+    return [item async for item in dataset.iterate_items()]
